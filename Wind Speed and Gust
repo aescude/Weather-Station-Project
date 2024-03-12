@@ -1,0 +1,52 @@
+from gpiozero import Button
+import time
+import math
+import statistics
+
+wind_count = 0
+radius_in = 3.5 #inches
+wind_interval = 5 #seconds
+
+#adds 1 to count each half spin
+def spin():
+    global wind_count
+    wind_count = wind_count + 1
+    #print("spin" + str(wind_count))
+
+#calculates speed
+def calc_speed(time_sec):
+    global wind_count
+    circumference_in = (2 * math.pi) * radius_in
+    rotations = wind_count / 2
+
+    #distance in miles = (inches * rotations) / inches in mile
+    distance_mi = (circumference_in * rotations) / 63360
+
+    #
+    mi_per_s = distance_mi / time_sec
+
+    #speed = miles per hour, mph = miles per second * seconds in hour
+    speed = mi_per_s * 3600
+
+    adjustment = 1.18
+    return speed * adjustment
+
+def reset_wind():
+    global wind_count
+    wind_count = 0
+
+wind_speed_sensor = Button(5)
+wind_speed_sensor.when_pressed = spin
+
+wind_gust = 0
+
+while True:
+    wind_count = 0
+    time.sleep(wind_interval)
+    
+    final_speed = calc_speed(wind_interval)
+    
+    if final_speed >= wind_gust:
+        wind_gust = final_speed
+    
+    print (final_speed, "mi/h, ", wind_gust, "wind gust")
