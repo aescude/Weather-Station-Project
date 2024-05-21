@@ -1,0 +1,24 @@
+from gpiozero import Button
+import time
+
+rain_sensor = Button(6)
+bucket_size = 0.011 #inches
+rain_count = 0
+rain_inch = 0
+rain_interval = 5
+
+def bucket_tipped():
+    global rain_count
+    global rain_inch
+    rain_count = rain_count + 1
+    rain_inch = rain_count * bucket_size
+
+def reset_rainfall():
+    global rain_count
+    rain_count = 0
+
+while True:
+    time.sleep(rain_interval)
+    rain_sensor.when_pressed = bucket_tipped
+    print (round (rain_inch, 2), "inches of rain over past 5 secs")
+    reset_rainfall()
