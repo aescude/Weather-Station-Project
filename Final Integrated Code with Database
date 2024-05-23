@@ -1,0 +1,195 @@
+import database
+from gpiozero import Button
+import time
+import math
+import statistics
+import bme280
+import smbus2
+from wind_direction import get_value
+from wind_direction import get_average
+import os, glob, time
+
+
+store_speeds = []
+store_directions = []
+
+gusts = []
+
+wind_count = 0
+radius_in = 3.543 #inches
+wind_interval = 10 #seconds
+
+gust_interval = 5 #seconds
+
+bucketsize = 0.011 #inches
+rain_count = 0
+
+port = 1
+address = 0x77
+bus = smbus2.SMBus(port)
+bme280.load_calibration_params(bus,address)
+
+
+#wind functions and variables
+def spin():
+    global wind_count
+    wind_count = wind_count + 1
+    #print("spin" + str(wind_count))
+
+def calc_speed(time_sec):
+    global wind_count
+    circumference_in = (2 * math.pi) * radius_in
+    rotations = wind_count / 2
+
+    distance_mi = (circumference_in * rotations) / 63360
+
+    mi_per_s = distance_mi / time_sec
+
+speed = mi_per_s * 3600
+
+    adjustment = 1.18
+    return speed * adjustment
+
+def reset_wind():
+    global wind_count
+    wind_count = 0
+
+wind_speed_sensor = Button(5)
+wind_speed_sensor.when_pressed = spin
+
+
+#rain functions and variables
+def bucket_tipped():
+    global rain_count
+    rain_count = rain_count + 1
+    #print (rain_count * BUCKET_SIZE)
+
+def reset_rainfall():
+    global rain_count
+    rain_count = 0
+
+rain_sensor = Button(6)
+rain_sensor.when_pressed = bucket_tipped
+
+
+#ds18b20 functions 
+class DS18B20(object):
+    def __init__(self):        
+        self.device_file = glob.glob("/sys/bus/w1/devices/28*")[0] + "/w1_slave"
+        
+    def read_temp_raw(self):
+        f = open(self.device_file, "r")
+        lines = f.readlines()
+        f.close()
+        return lines
+        
+    def crc_check(self, lines):
+        return lines[0].strip()[-3:] == "YES"
+        
+    def read_temp(self):
+        temp_c = -255
+        attempts = 0
+        
+        lines = self.read_temp_raw()
+        success = self.crc_check(lines)
+        
+        while not success and attempts < 3:
+            time.sleep(.2)
+            lines = self.read_temp_raw()            
+            success = self.crc_check(lines)
+            attempts += 1
+        
+        if success:
+            temp_line = lines[1]
+            equal_pos = temp_line.find("t=")            
+            if equal_pos != -1:
+                temp_string = temp_line[equal_pos+2:]
+                temp_c = float(temp_string)/1000.0
+        
+        return temp_c
+
+def thermalprobe():
+    obj = DS18B20()
+    return obj.read_temp()
+
+
+db = database.weather_database()
+
+while True:
+    print ('recording for', wind_interval, 'seconds')
+    start_time = time.time()
+    gust_time = time.time()
+    gusts = []
+
+    while time.time() - gust_time <= gust_interval:
+        wind_gust = 0
+        gust_speed = calc_speed(gust_interval)
+        gusts.append(gust_speed)
+
+    while time.time() - start_time <= wind_interval:
+        wind_start_time = time.time()
+        reset_wind()
+        #time.sleep(wind_interval)
+        while time.time() - start_time <= wind_interval:
+            store_directions.append(get_value())
+        
+        final_speed = calc_speed(wind_interval)
+        store_speeds.append(final_speed)
+
+    
+    #wind direction code, finding compass direction
+
+wind_average = get_average(store_directions)
+    comp_deg = round(wind_average)
+    compassdir = "nothing"
+
+    if comp_deg > 337.5 or comp_deg < 22.5:
+        compassdir = 'S'
+    if comp_deg > 22.5 and comp_deg < 67.5:
+        compassdir = 'SW'
+    if comp_deg > 67.5 and comp_deg < 112.5:
+        compassdir = 'W'
+    if comp_deg > 112.5 and comp_deg < 157.5:
+        compassdir = 'NW'
+    if comp_deg > 157.5 and comp_deg < 202.5:
+        compassdir = 'N'
+    if comp_deg > 202.5 and comp_deg < 247.5:
+        compassdir = 'NE'
+    if comp_deg > 247.5 and comp_deg < 292.5:
+        compassdir = 'E'
+    if comp_deg > 292.5 and comp_deg < 337.5:
+        compassdir = 'SE'
+
+    #wind speed variable setting
+    wind_speed = statistics.mean(store_speeds)
+
+wind_gust = max(gusts)
+
+    #rainfall code
+    rainfall = rain_count * bucketsize
+    reset_rainfall()
+
+    #bme280 sensor variable setting
+    bme280_data = bme280.sample(bus,address)
+    humidity  = bme280_data.humidity
+    pressure  = bme280_data.pressure
+    ambienttemp = bme280_data.temperature
+
+    #DS18b20 sensor variable setting
+    ground_temp = thermalprobe()
+
+#the prints for all the various sensors
+    print ()
+    print ("wind speed:", round (wind_speed, 2), "mi/h, ", round (wind_gust, 2), "mi/h gust")
+    print ("wind direction:", comp_deg, "average angle, ", compassdir, "average direction")
+    print ("rainfall:", round (rainfall, 2), "inches")
+    print ("humidity:", round(humidity, 2), ",", "pressure:", round(pressure, 2)
+, ",", "ambient temperature:", round (ambienttemp, 2))
+    print ("ground temperature:", round (ground_temp, 2))
+    print ()
+
+#list resets
+    store_speeds = []
+    store_directions = []
+
+db.insert(ambient_temp, ground_temp, 0, pressure, humidity, wind_average, wind_speed, wind_gust, rainfall)
