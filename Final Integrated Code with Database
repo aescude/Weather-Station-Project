@@ -45,7 +45,7 @@ def calc_speed(time_sec):
 
     mi_per_s = distance_mi / time_sec
 
-speed = mi_per_s * 3600
+    speed = mi_per_s * 3600
 
     adjustment = 1.18
     return speed * adjustment
@@ -115,6 +115,7 @@ def thermalprobe():
 
 db = database.weather_database()
 
+
 while True:
     print ('recording for', wind_interval, 'seconds')
     start_time = time.time()
@@ -138,8 +139,7 @@ while True:
 
     
     #wind direction code, finding compass direction
-
-wind_average = get_average(store_directions)
+    wind_average = get_average(store_directions)
     comp_deg = round(wind_average)
     compassdir = "nothing"
 
@@ -162,8 +162,7 @@ wind_average = get_average(store_directions)
 
     #wind speed variable setting
     wind_speed = statistics.mean(store_speeds)
-
-wind_gust = max(gusts)
+    wind_gust = max(gusts)
 
     #rainfall code
     rainfall = rain_count * bucketsize
@@ -183,8 +182,7 @@ wind_gust = max(gusts)
     print ("wind speed:", round (wind_speed, 2), "mi/h, ", round (wind_gust, 2), "mi/h gust")
     print ("wind direction:", comp_deg, "average angle, ", compassdir, "average direction")
     print ("rainfall:", round (rainfall, 2), "inches")
-    print ("humidity:", round(humidity, 2), ",", "pressure:", round(pressure, 2)
-, ",", "ambient temperature:", round (ambienttemp, 2))
+    print ("humidity:", round(humidity, 2), ",", "pressure:", round(pressure, 2), ",", "ambient temperature:", round (ambienttemp, 2))
     print ("ground temperature:", round (ground_temp, 2))
     print ()
 
