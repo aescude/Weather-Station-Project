@@ -17,7 +17,7 @@ gusts = []
 
 wind_count = 0
 radius_in = 3.543 #inches
-wind_interval = 10 #seconds
+wind_interval = 300 #seconds
 
 gust_interval = 5 #seconds
 
